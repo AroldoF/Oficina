@@ -28,6 +28,11 @@ public class ApiExceptionHandler {
         return error(HttpStatus.UNPROCESSABLE_ENTITY, exception.getMessage(), request);
     }
 
+    @ExceptionHandler(ChavePixJaCadastradaException.class)
+    public ResponseEntity<ApiError> conflict(RuntimeException exception, HttpServletRequest request) {
+        return error(HttpStatus.CONFLICT, exception.getMessage(), request);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> validation(MethodArgumentNotValidException exception, HttpServletRequest request) {
         String message = exception.getBindingResult().getFieldErrors().stream()

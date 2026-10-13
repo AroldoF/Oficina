@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface ContaRepository extends JpaRepository<Conta, Long> {
     Optional<Conta> findByChavePix(String chavePix);
+
+    boolean existsByChavePix(String chavePix);
 }

@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class TransferenciaControllerIT {
 
     private static final String URL = "/api/v1/pix/transferir";
+    private static final String CONTAS_URL = "/api/v1/contas";
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
@@ -94,6 +95,39 @@ class TransferenciaControllerIT {
                         .content("{\"contaOrigemId\":null,\"chavePixDestino\":\"\",\"valor\":0}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void deveCriarContaERetornar201() throws Exception {
+        mockMvc.perform(post(CONTAS_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"titular\":\"Carol Souza\",\"chavePix\":\"carol@email.com\",\"saldoInicial\":25.50}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.titular").value("Carol Souza"))
+                .andExpect(jsonPath("$.chavePix").value("carol@email.com"))
+                .andExpect(jsonPath("$.saldo").value(25.50))
+                .andExpect(jsonPath("$.ativa").value(true));
+
+        assertThat(contaRepository.findByChavePix("carol@email.com")).isPresent();
+    }
+
+    @Test
+    void deveRetornar409QuandoChavePixJaEstaCadastrada() throws Exception {
+        mockMvc.perform(post(CONTAS_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"titular\":\"Outra Alice\",\"chavePix\":\"alice@email.com\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Já existe uma conta cadastrada com esta chave PIX"));
+    }
+
+    @Test
+    void deveExporContratoOpenApi() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.info.title").value("API de Transferências PIX"))
+                .andExpect(jsonPath("$.paths['/api/v1/contas'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/pix/transferir'].post").exists());
     }
 
     private String body(Long origemId, String chavePixDestino, String valor) throws Exception {
