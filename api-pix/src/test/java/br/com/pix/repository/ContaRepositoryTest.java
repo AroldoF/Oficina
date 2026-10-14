@@ -12,7 +12,8 @@ import org.springframework.test.context.ActiveProfiles;
 import java.math.BigDecimal;
 import java.util.Optional;
 
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -34,7 +35,7 @@ class ContaRepositoryTest {
 
         System.out.println("Conta localizada pela chave pix: " + result.get().getChavePix());
 
-        assertThat(result.isPresent()).isTrue();
+        assertTrue(result.isPresent());
     }
 
     @Test
@@ -44,7 +45,7 @@ class ContaRepositoryTest {
 
         Optional<Conta> result = this.contaRepository.findByChavePix(chavePix);
 
-        assertThat(result.isEmpty()).isTrue();
+        assertFalse(result.isPresent());
     }
 
     private Conta createConta(CriarContaRequest data){
