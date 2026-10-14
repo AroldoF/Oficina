@@ -394,6 +394,11 @@ Ideia central: o objetivo é o mesmo (testar), muda o estilo.
 JUnit é mais verboso e explícito; pytest é mais enxuto.
 -->
 
+<style>
+table td, table th { padding: 3px 10px; }
+table { font-size: 0.85em; }
+</style>
+
 ---
 layout: center
 class: text-center
