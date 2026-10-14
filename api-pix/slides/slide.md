@@ -1,330 +1,371 @@
-# Entendendo um teste com JUnit e Mockito
+# Testes unitários em Java
 
-## Cadastro de conta Pix com `ContaService`
+## JUnit 5 · Mockito · JaCoCo
 
-**Objetivo:** entender o que cada anotação e chamada faz, não apenas copiar o teste.
+**Exemplo:** criação de conta Pix com Spring Boot
 
-<small>Material para vscode-reveal / Reveal.js</small>
-
----
-
-# O que estamos testando?
-
-O método `ContaService.criar(request)`:
-
-- verifica se a chave Pix já existe;
-- define o saldo inicial como zero se ele for `null`;
-- salva uma entidade `Conta`;
-- transforma a entidade em `ContaResponse`.
-
-<small class="fragment">O teste unitário verifica a lógica do serviço sem precisar subir o Spring nem conectar a um banco real.</small>
+Apresentação para acompanhar no VS Code com a extensão `vscode-reveal`.
 
 ---
 
-# Antes de começar: JUnit e Mockito
+## O que vamos testar?
 
-**JUnit 5** organiza e executa os testes. Ele fornece `@Test`, `@BeforeEach` e asserções como `assertThrows`.
+O serviço tem três comportamentos relevantes:
 
-**Mockito** cria objetos simulados (*mocks*) e permite controlar o comportamento das dependências.
+- Criar conta quando a chave Pix ainda não existe. {.fragment}
+- Rejeitar uma chave Pix já cadastrada. {.fragment}
+- Usar saldo zero quando o saldo inicial é `null`. {.fragment}
 
-<small class="fragment">Eles são complementares: JUnit executa e verifica; Mockito isola o serviço das dependências externas.</small>
+**Objetivo:** verificar comportamento, não apenas executar linhas.
 
 ---
 
-# `@Test` — qual método é um teste?
+## Três ferramentas, três responsabilidades
+
+- **JUnit Jupiter:** organiza e executa os testes; oferece `@Test` e asserções. {.fragment}
+- **Mockito:** substitui dependências por objetos simulados (*mocks*) e verifica interações. {.fragment}
+- **JaCoCo:** mede cobertura de execução do código durante os testes. {.fragment}
+
+JUnit e Mockito ajudam a testar. JaCoCo mede quais partes do código foram executadas.
+
+---
+
+## Estrutura do teste
 
 ```java
 @Test
-void deveCriarContaComSucesso() {
-    // cenário e verificações
+void deveCriarContaQuandoChavePixAindaNaoExiste() {
+    // Arrange
+    // Act
+    // Assert
 }
 ```
 
-- `@Test` vem do JUnit Jupiter.
-- Informa ao mecanismo de testes que aquele método deve ser executado como teste.
-- O nome do método deve descrever o comportamento esperado.
+- **Arrange:** preparar dados e dependências. {.fragment}
+- **Act:** executar o comportamento testado. {.fragment}
+- **Assert:** verificar resultado e efeitos esperados. {.fragment}
 
-<small class="fragment">Um teste deve verificar um comportamento observável, e não simplesmente executar o método sem conferir nada.</small>
+Esse padrão é conhecido como AAA (*Arrange, Act, Assert*).
 
 ---
 
-# `@ExtendWith(MockitoExtension.class)`
+## `@ExtendWith(MockitoExtension.class)`
 
 ```java
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 @ExtendWith(MockitoExtension.class)
 class ContaServiceTest {
 }
 ```
 
-- `@ExtendWith` é uma anotação do **JUnit 5** que registra uma extensão para participar do ciclo de vida dos testes.
-- `MockitoExtension.class` é a extensão fornecida pelo **Mockito** para integrar seus recursos ao JUnit.
-- Ela inicializa e gerencia as anotações Mockito, como `@Mock`, em cada teste.
+- `@ExtendWith` **vem do JUnit Jupiter**. {.fragment}
+- `MockitoExtension` **vem do módulo Mockito para JUnit Jupiter**. {.fragment}
+- A extensão inicializa os mocks e integra o ciclo de vida do Mockito aos testes. {.fragment}
 
-<small class="fragment">Sem essa extensão, as anotações Mockito não são inicializadas automaticamente nesse estilo de teste — seria necessário inicializá-las de outra forma.</small>
+Sem essa integração, anotações como `@Mock` não são inicializadas automaticamente por essa extensão.
 
 ---
 
-# `@Mock` — criar uma dependência simulada
+## `@Mock`: criar uma dependência simulada
 
 ```java
 @Mock
 private ContaRepository contaRepository;
 ```
 
-- `@Mock` vem do Mockito.
-- Cria um objeto falso que implementa o comportamento da dependência, controlado pelo teste.
-- Não executa as consultas reais do repositório nem acessa o banco.
+Um *mock* é um objeto controlado pelo teste. Ele substitui o repositório real, evitando acesso ao banco de dados neste teste unitário.
 
-<small class="fragment">Neste teste, nós decidimos se `existsByChavePix(...)` retorna `true` ou `false`.</small>
+- Podemos programar o retorno de seus métodos. {.fragment}
+- Podemos verificar se métodos foram chamados. {.fragment}
+- Ele não persiste dados de verdade. {.fragment}
 
 ---
 
-# `@InjectMocks` — montar a classe testada
+## `@InjectMocks`: montar a classe testada
 
 ```java
 @InjectMocks
 private ContaService contaService;
 ```
 
-- `@InjectMocks` vem do Mockito.
-- Mockito cria ou prepara a instância de `ContaService` e tenta injetar nela os mocks necessários.
-- Como `ContaService` recebe `ContaRepository` no construtor, o mock pode ser injetado por esse construtor.
+Mockito cria uma instância de `ContaService` e tenta injetar nela os mocks compatíveis.
 
-<small class="fragment">Isso não inicia o Spring. É uma instanciação gerenciada pelo Mockito, apropriada para um teste unitário simples.</small>
+Neste exemplo, `ContaService` tem um construtor que recebe `ContaRepository`. O mock é fornecido pelo Mockito, e o método `criar` executado é o método real do serviço.
+
+**Não é necessário iniciar todo o Spring** para este teste unitário.
 
 ---
 
-# `@Mock` + `@InjectMocks`: o desenho
+## `@Test`: marcar um caso de teste
 
-```text
-ContaServiceTest
-    |
-    | @InjectMocks
-    v
-ContaService  -------- usa --------> ContaRepository simulado
-                                        (@Mock)
+```java
+@Test
+void deveCriarContaQuandoChavePixAindaNaoExiste() {
+    // cenário e verificações
+}
 ```
 
-O serviço é real. O repositório é simulado.
+`@Test` é uma anotação do JUnit Jupiter. O mecanismo de testes descobre e executa o método.
 
-<small class="fragment">Assim, o teste concentra-se nas decisões de `ContaService`, não no funcionamento do banco de dados.</small>
+Boas práticas para nomes:
+
+- Indicar o comportamento esperado. {.fragment}
+- Usar um cenário por teste. {.fragment}
+- Evitar depender da ordem em que os testes são executados. {.fragment}
 
 ---
 
-# `when(...).thenReturn(false)`
+## Arrange: preparar a entrada
+
+```java
+CriarContaRequest request = new CriarContaRequest(
+    "Maria Silva",
+    "maria@example.com",
+    new BigDecimal("100.00")
+);
+```
+
+O objeto representa os dados enviados ao serviço: titular, chave Pix e saldo inicial.
+
+Usamos `BigDecimal` para valores monetários, evitando os erros de precisão binária comuns em `float` e `double`.
+
+> Ajuste os argumentos caso o construtor real de `CriarContaRequest` seja diferente.
+
+---
+
+## `when(...).thenReturn(...)`: configurar o mock
 
 ```java
 when(contaRepository.existsByChavePix(request.chavePix()))
     .thenReturn(false);
 ```
 
-- `when(...)` diz qual chamada simulada queremos configurar.
-- `existsByChavePix(...)` é o método do repositório que o serviço consulta.
-- `thenReturn(false)` define o resultado que o mock devolverá quando essa chamada ocorrer.
+Leitura: “quando o serviço consultar se esta chave Pix existe, o repositório simulado responderá `false`”.
 
-<small class="fragment">Neste cenário, o teste está dizendo: “finja que essa chave Pix ainda não está cadastrada”.</small>
+- `when(...)` identifica a chamada simulada. {.fragment}
+- `thenReturn(false)` define o retorno. {.fragment}
+- Isso não executa uma consulta real ao banco. {.fragment}
 
----
-
-# Por que configurar esse retorno?
-
-O serviço contém uma decisão semelhante a esta:
-
-```java
-if (contaRepository.existsByChavePix(request.chavePix())) {
-    throw new ChavePixJaCadastradaException();
-}
-```
-
-- Se o mock retornar `true`, esperamos a exceção.
-- Se retornar `false`, o fluxo pode continuar para salvar a conta.
-
-<small class="fragment">O teste controla a entrada da dependência para verificar os diferentes caminhos da regra de negócio.</small>
+O cenário de sucesso depende de o serviço receber `false` nessa verificação.
 
 ---
 
-# `any(Conta.class)` — aceitar qualquer Conta
-
-```java
-when(contaRepository.save(any(Conta.class)))
-```
-
-- `any(...)` é um *argument matcher* do Mockito.
-- `any(Conta.class)` corresponde a um argumento do tipo `Conta`.
-- Evita que o teste precise construir previamente exatamente a mesma instância que o serviço criará.
-
-<small class="fragment">Atenção: matchers como `any()` são usados na configuração e verificação de mocks. Não são valores reais para passar ao código de produção.</small>
-
----
-
-# `thenAnswer(...)` — calcular a resposta do mock
+## Por que configurar `save`?
 
 ```java
 when(contaRepository.save(any(Conta.class)))
     .thenAnswer(invocation -> invocation.getArgument(0));
 ```
 
-- `thenAnswer` define uma resposta dinâmica para a chamada simulada.
-- `invocation` representa a chamada feita ao mock.
-- `getArgument(0)` recupera o primeiro argumento passado para `save`, neste caso a própria `Conta`.
+Métodos de mocks retornam valores padrão quando não são configurados. Para um objeto, normalmente é `null`.
 
-<small class="fragment">O mock devolve a entidade recebida. É uma simulação simples: não grava no banco nem gera necessariamente um ID como um repositório JPA real faria.</small>
+- `any(Conta.class)` combina com uma chamada de `save` que recebe uma conta. {.fragment}
+- `thenAnswer(...)` permite calcular o retorno com base na chamada. {.fragment}
+- `getArgument(0)` devolve o primeiro argumento: a própria entidade enviada ao `save`. {.fragment}
 
----
-
-# `thenReturn` ou `thenAnswer`?
-
-**`thenReturn(valor)`**
-
-Use quando a resposta é conhecida e fixa, por exemplo, `false` para indicar que a chave não existe.
-
-**`thenAnswer(invocation -> ...)`**
-
-Use quando a resposta depende dos argumentos da chamada ou precisa ser calculada.
-
-<small class="fragment">Para `save`, devolver o argumento recebido pode ser útil. Em outros testes, você pode devolver uma entidade preparada com ID para simular um resultado mais próximo do esperado.</small>
+Isso é uma simulação simples — não representa uma persistência JPA completa nem gera um ID.
 
 ---
 
-# `assertThrows` — confirmar uma exceção
+## Act: executar o método real
 
 ```java
+ContaResponse response = contaService.criar(request);
+```
+
+O teste chama `criar` de verdade. Dentro dele, o serviço consulta e usa o repositório simulado.
+
+O objetivo do teste unitário é verificar a lógica do `ContaService`, isolando a dependência externa, não testar o comportamento interno do Spring Data JPA.
+
+---
+
+## Assert: verificar o resultado
+
+```java
+assertNotNull(response);
+```
+
+`assertNotNull` é uma asserção do JUnit: falha se a resposta for `null`.
+
+Outras asserções comuns:
+
+- `assertEquals(esperado, obtido)` verifica igualdade. {.fragment}
+- `assertTrue(condicao)` verifica uma condição verdadeira. {.fragment}
+- `assertThrows(TipoException.class, executable)` verifica uma exceção. {.fragment}
+
+Asserções são o que transforma uma execução em uma verificação automática.
+
+---
+
+## `verify`: verificar interações com o mock
+
+```java
+verify(contaRepository).existsByChavePix(request.chavePix());
+verify(contaRepository).save(captor.capture());
+```
+
+`verify` faz parte do Mockito e verifica se uma chamada ocorreu.
+
+- Sem modo adicional, `verify(mock).metodo()` espera uma chamada. {.fragment}
+- `ArgumentCaptor` captura o argumento enviado ao método. {.fragment}
+- Depois podemos verificar a entidade criada pelo serviço. {.fragment}
+
+Use verificações de interação quando elas forem relevantes para o comportamento; não é necessário verificar cada chamada sem motivo.
+
+---
+
+## `ArgumentCaptor`: inspecionar a conta enviada
+
+```java
+ArgumentCaptor<Conta> captor = ArgumentCaptor.forClass(Conta.class);
+verify(contaRepository).save(captor.capture());
+
+Conta contaSalva = captor.getValue();
+assertEquals("Maria Silva", contaSalva.getTitular());
+assertEquals("maria@example.com", contaSalva.getChavePix());
+assertEquals(0, contaSalva.getSaldo().compareTo(new BigDecimal("100.00")));
+```
+
+`ArgumentCaptor` pertence ao Mockito. Ele captura o argumento passado a `save`, para então inspecionar os dados.
+
+Para `BigDecimal`, `compareTo` é usado aqui porque compara o valor numérico sem exigir escala igual (`100.0` e `100.00` representam o mesmo valor).
+
+> Este exemplo pressupõe getters `getTitular()`, `getChavePix()` e `getSaldo()` na entidade `Conta`.
+
+---
+
+## Caso negativo: chave Pix duplicada
+
+```java
+when(contaRepository.existsByChavePix(request.chavePix()))
+    .thenReturn(true);
+
 assertThrows(
     ChavePixJaCadastradaException.class,
     () -> contaService.criar(request)
 );
-```
 
-- `assertThrows` vem do JUnit.
-- Verifica se a ação executada lança uma exceção do tipo esperado.
-- `() -> ...` é uma expressão lambda que adia a execução da chamada até o JUnit avaliá-la.
-
-<small class="fragment">Se nenhuma exceção for lançada, ou se for lançada uma exceção incompatível, o teste falha.</small>
-
----
-
-# `verify(...)` — verificar uma interação
-
-```java
-verify(contaRepository).save(any(Conta.class));
-```
-
-- `verify` vem do Mockito.
-- Verifica se o mock recebeu a chamada especificada durante o teste.
-- Por padrão, verifica que a chamada ocorreu uma vez.
-
-<small class="fragment">É útil quando a interação é parte do comportamento esperado — por exemplo, garantir que o serviço solicitou o salvamento da conta.</small>
-
----
-
-# `never()` — garantir que algo não ocorreu
-
-```java
 verify(contaRepository, never()).save(any(Conta.class));
 ```
 
-- `never()` é um modo de verificação do Mockito.
-- O teste falha se `save` tiver sido chamado pelo menos uma vez.
-- No cenário de chave Pix duplicada, isso garante que a conta não seja enviada para persistência.
-
-<small class="fragment">Não basta verificar que a exceção ocorreu: também podemos verificar que o serviço não executou um efeito colateral proibido.</small>
+- `assertThrows` é do JUnit. Confirma que a exceção esperada foi lançada. {.fragment}
+- `never()` é do Mockito. Confirma que `save` não foi chamado. {.fragment}
+- O teste protege tanto a regra de negócio quanto o efeito esperado no repositório. {.fragment}
 
 ---
 
-# `@BeforeEach` — preparar cada teste
+## Outro caminho: saldo inicial nulo
+
+No serviço, a regra é:
 
 ```java
-@BeforeEach
-void setUp() {
-    request = new CriarContaRequest(...);
-}
+BigDecimal saldoInicial = request.saldoInicial() == null
+    ? BigDecimal.ZERO
+    : request.saldoInicial();
 ```
 
-- `@BeforeEach` vem do JUnit.
-- Executa o método antes de cada método de teste.
-- É adequado para preparar objetos e valores comuns aos cenários.
+O teste envia `null`, captura a entidade recebida pelo repositório e verifica que seu saldo é `BigDecimal.ZERO`.
 
-<small class="fragment">Cada teste deve continuar independente. Evite compartilhar estado mutável que faça um teste depender da ordem de execução.</small>
+Esse cenário cobre um caminho diferente do cadastro com saldo informado. Testes bons cobrem comportamentos relevantes, não apenas linhas distintas.
 
 ---
 
-# `@SpringBootTest` — iniciar o contexto Spring
+## Dependência de teste no Maven
 
-```java
-@SpringBootTest
-class ContaServiceIntegrationTest {
-}
+Se o projeto já usa o starter de testes do Spring Boot, normalmente basta:
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-test</artifactId>
+    <scope>test</scope>
+</dependency>
 ```
 
-- Vem do **Spring Boot Test**, não do JUnit nem do Mockito.
-- Carrega o contexto da aplicação Spring para o teste.
-- Permite testar a integração entre beans configurados pela aplicação.
-
-<small class="fragment">É mais pesado que um teste unitário com `@ExtendWith(MockitoExtension.class)`. Use quando precisar validar a configuração e a integração do Spring, não apenas a lógica isolada do serviço.</small>
+Ele reúne JUnit Jupiter, Mockito e outras ferramentas comuns de teste. Não adicione versões manuais sem necessidade quando o Spring Boot já gerencia as dependências.
 
 ---
 
-# `@AutoConfigureMockMvc` — testar a camada HTTP
+## JaCoCo: medir cobertura
 
-```java
-@SpringBootTest
-@AutoConfigureMockMvc
-class ContaControllerTest {
-    @Autowired
-    MockMvc mockMvc;
-}
+JaCoCo é uma ferramenta de cobertura. Ela instrumenta a execução dos testes e gera um relatório sobre instruções, linhas e ramificações executadas.
+
+Ele **não cria testes nem prova que as asserções estão corretas**.
+
+No `pom.xml`, adicione o plugin ao bloco `<build><plugins>`:
+
+```xml
+<plugin>
+    <groupId>org.jacoco</groupId>
+    <artifactId>jacoco-maven-plugin</artifactId>
+    <version>0.8.15</version>
+    <executions>
+        <execution>
+            <goals><goal>prepare-agent</goal></goals>
+        </execution>
+        <execution>
+            <id>report</id>
+            <phase>verify</phase>
+            <goals><goal>report</goal></goals>
+        </execution>
+    </executions>
+</plugin>
 ```
 
-- Vem do Spring Boot Test.
-- Configura o `MockMvc` para enviar requisições simuladas à camada MVC do Spring.
-- Permite testar rotas, status HTTP, JSON, validação e comportamento dos controllers sem abrir um servidor HTTP real.
-
-<small class="fragment">Com `@SpringBootTest`, o contexto completo é carregado; `@AutoConfigureMockMvc` acrescenta a infraestrutura para fazer chamadas MVC simuladas.</small>
+A versão `0.8.15` tem suporte oficial a Java 26; portanto, cobre também o Java 25 usado neste exemplo.
 
 ---
 
-# Qual abordagem escolher?
+## Executar testes e criar relatório
 
-| Abordagem | O que testa | Contexto Spring |
-|---|---|---|
-| JUnit + MockitoExtension | Regra de uma classe isolada | Não inicia |
-| `@WebMvcTest` | Controller / camada MVC | Parcial, focado na web |
-| `@SpringBootTest` | Integração da aplicação | Completo |
-| `@SpringBootTest` + `@AutoConfigureMockMvc` | Fluxo HTTP usando contexto completo | Completo + MockMvc |
+No terminal, na raiz do projeto Maven:
 
-<small class="fragment">Não existe uma anotação “melhor” em todos os casos: escolha a menor infraestrutura que valide o comportamento desejado.</small>
+```bash
+./mvnw clean verify
+```
 
----
+Ou, sem Maven Wrapper:
 
-# JaCoCo — cobertura não é qualidade
+```bash
+mvn clean verify
+```
 
-JaCoCo instrumenta a execução e gera métricas como cobertura de instruções, linhas e ramificações.
+O relatório HTML costuma ser criado em:
 
-- JUnit executa os testes.
-- Mockito isola dependências ou verifica interações.
-- JaCoCo mede partes do código que foram executadas.
+`target/site/jacoco/index.html`
 
-<small class="fragment">Cobertura alta não prova que as asserções são boas nem que todos os comportamentos relevantes foram verificados.</small>
+Abra o arquivo no navegador e navegue até `ContaService` para ver a cobertura da classe.
 
 ---
 
-# Resumo: leia o teste como uma história
+## Cobertura não é qualidade
 
-1. **Preparar:** `@Mock`, `@InjectMocks`, `@BeforeEach`.
-2. **Definir o cenário:** `when(...).thenReturn(...)`.
-3. **Executar:** chamar `contaService.criar(request)`.
-4. **Verificar o resultado:** `assertNotNull`, `assertThrows`.
-5. **Verificar interações:** `verify`, `never`.
-6. **Medir cobertura:** JaCoCo.
+- 100% de cobertura significa que as partes mensuradas foram executadas; não garante que todos os resultados foram verificados. {.fragment}
+- Uma asserção fraca pode permitir que um bug passe mesmo com cobertura alta. {.fragment}
+- Combine cenários de sucesso, erro e limites relevantes. {.fragment}
 
-<small class="fragment">Um bom teste documenta o comportamento esperado e falha quando esse comportamento é quebrado.</small>
+**Prioridade:** testes que verificam comportamentos e regras de negócio; cobertura como indicador auxiliar.
 
 ---
 
-# Documentação oficial
+## Resumo
 
-- [JUnit 5 User Guide](https://junit.org/junit5/docs/current/user-guide/)
-- [Mockito — documentação e exemplos](https://javadoc.io/doc/org.mockito/mockito-core/latest/org/mockito/Mockito.html)
-- [Spring Boot — Testing](https://docs.spring.io/spring-boot/reference/testing/index.html)
-- [Spring MockMvc](https://docs.spring.io/spring-framework/reference/testing/mockmvc.html)
-- [JaCoCo](https://www.jacoco.org/jacoco/trunk/doc/)
+- **JUnit:** descreve, executa e verifica os casos de teste.
+- **Mockito:** isola dependências e verifica interações.
+- **JaCoCo:** informa o que foi executado.
+
+Fluxo usado nesta aula:
+
+**Arrange → Act → Assert → medir cobertura**
+
+---
+
+## Referências oficiais
+
+- JUnit 5: https://junit.org/junit5/docs/current/user-guide/
+- Mockito: https://javadoc.io/doc/org.mockito/mockito-junit-jupiter/latest/org/mockito/junit/jupiter/MockitoExtension.html
+- Spring Boot — dependências de teste: https://docs.spring.io/spring-boot/reference/testing/test-scope-dependencies.html
+- JaCoCo Maven Plugin: https://www.jacoco.org/jacoco/trunk/doc/maven.html
+- Reveal.js — realce de código: https://revealjs.com/code/
