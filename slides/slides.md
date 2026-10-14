@@ -1,16 +1,16 @@
 ---
-author: Renata, Alessandra, Heitor e Aroldo
-lang: pt-BR
-subtitle: Testes automatizados em Java
 theme: default
 title: JUnit, Mockito e JaCoCo
+author: Renata, Alessandra, Heitor e Aroldo
+lang: pt-BR
+transition: slide-left
 ---
 
 # JUnit, Mockito e JaCoCo
 
 ## Testes automatizados em Java
 
-**T01 --- Unitário / Integração**
+**T01 · Unitário / Integração**
 
 Validação de regras de negócio em um microsserviço Java
 
@@ -18,324 +18,297 @@ Renata · Alessandra · Heitor · Aroldo
 
 15/10
 
-------------------------------------------------------------------------
+---
 
-# Objetivos da aula
+# Motivação: e se a regra quebrar sem ninguém perceber?
 
-Ao final, você deverá conseguir:
+Um sistema de transferência PIX tem a regra: **o saldo deve cobrir o valor**.
 
--   Diferenciar testes unitários e testes de integração.
--   Escrever testes com **JUnit 5**.
--   Isolar dependências com **Mockito**.
--   Medir cobertura com **JaCoCo**.
--   Avaliar o que os testes realmente comprovam.
+Alguém altera o código e troca `>=` por `>` sem querer.
 
-------------------------------------------------------------------------
+<div class="grid grid-cols-2 gap-8 pt-4">
+<div>
 
-# O problema: como validar uma regra de negócio?
+### Sem teste automático
 
-Considere uma regra de um microsserviço de pedidos:
+<v-clicks>
 
-> Um pedido só pode ser confirmado quando o pagamento estiver aprovado.
+- Ninguém percebe na hora
+- O erro chega ao **cliente**: quem tem saldo exato não consegue transferir
+- Corrigir em produção custa caro
+- Medo de mexer no código
 
-Perguntas para orientar o teste:
+</v-clicks>
 
--   O pedido é confirmado quando o pagamento está aprovado?
--   O pedido continua pendente quando o pagamento é recusado?
--   O serviço trata corretamente uma falha na consulta do pagamento?
+</div>
+<div>
 
-**Ideia central:** testar comportamentos observáveis, não apenas
-executar linhas de código.
+### Com teste automático
 
-------------------------------------------------------------------------
+<v-clicks>
 
-# Três ferramentas, três responsabilidades
+- O teste **falha em segundos**
+- O erro é pego antes do commit
+- A regra fica documentada em código
+- Mudar o sistema com segurança
 
-  Ferramenta    Responsabilidade
-  ------------- ---------------------------------------------
-  **JUnit 5**   Organizar, executar e verificar testes
-  **Mockito**   Simular dependências e verificar interações
-  **JaCoCo**    Medir cobertura de código durante os testes
+</v-clicks>
 
-Elas se complementam, mas não são intercambiáveis.
+</div>
+</div>
 
--   JUnit responde: *o teste passou?*
--   Mockito ajuda a responder: *como a unidade interagiu com suas
-    dependências?*
--   JaCoCo responde: *quais partes do código foram executadas?*
+<!--
+Esse é o motivo de fazer testes: proteger as regras de negócio contra regressões.
+O mesmo projeto PIX será usado na parte prática.
+-->
 
-------------------------------------------------------------------------
+---
 
-# Onde cada tipo de teste se encaixa?
+# Pirâmide de testes
 
-## Teste unitário
+<div class="flex items-center justify-center h-full">
+  <img src="/imgs/piramideTeste.png" width="450" />
+</div>
 
-Verifica uma unidade pequena --- normalmente uma classe ou método ---
-com dependências externas isoladas.
+<!--
+Base: muitos testes unitários (rápidos, baratos).
+Meio: menos testes de integração.
+Topo: poucos testes ponta a ponta (lentos, caros).
+Hoje focamos na base e no meio: JUnit + Mockito (unitário) e Spring Boot Test (integração).
+-->
 
--   Rápido e direcionado.
--   Fácil de executar com frequência.
--   Bom para regras de negócio e cenários de erro.
+---
 
-## Teste de integração
+# Teste unitário × teste de integração
 
-Verifica se componentes funcionam juntos, por exemplo:
+<div class="grid grid-cols-2 gap-6">
+<div>
 
--   Serviço + banco de dados.
--   Aplicação + API externa simulada.
--   Repositório + configuração de persistência.
+### Unitário
 
-**Atenção:** um teste que usa Mockito não é automaticamente um teste de
-integração.
+Testa **uma unidade** (classe ou método), com as dependências **simuladas**.
 
-------------------------------------------------------------------------
+*Exemplo PIX:* `TransferenciaService` com o repository em mock. Sem banco e sem HTTP.
 
-# Exemplo de regra de negócio
+</div>
+<div>
 
-Vamos testar um serviço que confirma pedidos apenas quando o pagamento
-está aprovado.
+### Integração
 
-``` java
-public enum PaymentStatus {
-    APPROVED, REJECTED, PENDING
-}
+Testa **componentes juntos**: controller, service e banco.
 
-public record Order(String id, boolean confirmed) {
-    public Order confirm() {
-        return new Order(id, true);
-    }
-}
+*Exemplo PIX:* `POST /api/v1/pix/transferir` com banco H2 e conferindo o status HTTP.
+
+</div>
+</div>
+
+<v-click>
+
+> **Atenção:** usar Mockito não torna um teste de integração. Se há mock, ainda é unitário.
+
+</v-click>
+
+<!--
+Os colegas mostram os dois na parte prática:
+unitário (TransferenciaServiceTest) e integração (TransferenciaControllerIT).
+-->
+
+---
+
+# De onde saem os testes?
+
+**Da regra de negócio.** Primeiro se define o comportamento esperado, depois se escreve o teste.
+
+```mermaid {scale: 0.8}
+flowchart LR
+    A[Regra de negócio] --> B[Cenários<br/>feliz, erro, limite]
+    B --> C[Casos de teste]
+    C --> D[JUnit + Mockito]
 ```
 
-O domínio representa os estados possíveis. O serviço aplica a regra e
-coordena as dependências.
+<v-clicks>
 
-------------------------------------------------------------------------
+- A regra diz **o que** o sistema deve fazer
+- Cada regra gera **mais de um cenário**: o caminho feliz, os erros e os limites
+- Cada cenário vira **um teste**
 
-# O serviço a ser testado
+</v-clicks>
 
-``` java
-public interface PaymentGateway {
-    PaymentStatus getStatus(String orderId);
-}
+<!--
+Mensagem: não se testa "o código", testa-se o comportamento que a regra exige.
+Se a regra não estiver clara, o teste não tem o que comprovar.
+-->
 
-public interface OrderRepository {
-    Order findById(String orderId);
-    void save(Order order);
-}
-```
+---
 
-``` java
-public class OrderService {
-    private final PaymentGateway payments;
-    private final OrderRepository orders;
+# Exemplo: uma regra, três testes
 
-    public OrderService(PaymentGateway payments,
-                        OrderRepository orders) {
-        this.payments = payments;
-        this.orders = orders;
-    }
+> **RN02:** o saldo da conta de origem deve ser maior ou igual ao valor da transferência.
 
-    public void confirmIfPaid(String orderId) {
-        Order order = orders.findById(orderId);
-        PaymentStatus status = payments.getStatus(orderId);
+| Cenário | Entrada | Resultado esperado |
+|---|---|---|
+| Caminho feliz | saldo R$ 100, transfere R$ 40 | Transferência concluída |
+| Caso de erro | saldo R$ 30, transfere R$ 50 | `SaldoInsuficienteException` |
+| Limite | saldo R$ 50, transfere R$ 50 | Transferência concluída |
 
-        if (status != PaymentStatus.APPROVED) {
-            throw new IllegalStateException(
-                "Pagamento não aprovado"
-            );
-        }
+<v-click>
 
-        orders.save(order.confirm());
-    }
-}
-```
+O cenário de **limite** é o que mais pega erro (`>` no lugar de `>=`), o mesmo erro da motivação.
 
-**Contrato esperado:** somente pagamentos aprovados permitem salvar o
-pedido como confirmado.
+</v-click>
 
-------------------------------------------------------------------------
+<!--
+Fechamos o ciclo: o teste de limite teria pego o bug do começo.
+Os colegas vão escrever esses testes ao vivo na parte prática.
+-->
 
-# JUnit 5: estrutura de um teste
+---
 
-``` java
-import org.junit.jupiter.api.Test;
+# Três ferramentas, três perguntas
 
-import static org.junit.jupiter.api.Assertions.*;
+| Ferramenta | Responde | Faz o quê |
+|---|---|---|
+| **JUnit 5** | *O teste passou?* | Organiza, executa e verifica os testes |
+| **Mockito** | *Como a classe usou suas dependências?* | Cria dependências simuladas (mocks) |
+| **JaCoCo** | *Que partes do código foram executadas?* | Mede a cobertura |
 
-class ExampleTest {
-    @Test
-    void shouldAddTwoNumbers() {
-        int result = 2 + 3;
+<br>
 
-        assertEquals(5, result);
-    }
-}
-```
+<v-click>
 
--   `@Test`: identifica um método de teste.
--   `assertEquals`: compara o resultado esperado com o obtido.
--   O teste deve falhar quando o comportamento estiver incorreto.
+Elas **se complementam**, mas não substituem uma à outra.
 
-Outras asserções comuns: `assertTrue`, `assertFalse`, `assertNull` e
-`assertThrows`.
+</v-click>
 
-------------------------------------------------------------------------
+---
 
-# Padrão Arrange--Act--Assert
+# JUnit 5
 
-Uma estrutura simples para deixar os testes legíveis:
+**Framework** para escrever e executar testes em Java.
 
-1.  **Arrange:** preparar dados e dependências.
-2.  **Act:** executar a ação testada.
-3.  **Assert:** verificar o resultado.
-
-``` java
+```java
 @Test
-void shouldReturnExpectedValue() {
-    // Arrange
-    int a = 2;
-    int b = 3;
+void deveSomarDoisNumeros() {
+    int resultado = 2 + 3;
 
-    // Act
-    int result = a + b;
-
-    // Assert
-    assertEquals(5, result);
+    assertEquals(5, resultado);
 }
 ```
 
-O nome do teste deve descrever o cenário e o comportamento esperado.
+<v-clicks>
 
-------------------------------------------------------------------------
+- `@Test` marca o método de teste
+- `assertEquals`, `assertTrue`, `assertThrows` comparam esperado × obtido
+- O teste **falha** quando o comportamento está errado
+- Roda pelo Maven (`./mvnw test`) e pelo IntelliJ
 
-# Mockito: isolar dependências
+</v-clicks>
 
-Um teste unitário de `OrderService` não precisa chamar um gateway de
-pagamento real nem acessar o banco.
+---
 
-Mockito permite criar objetos simulados (*mocks*):
+# Padrão AAA: Arrange, Act, Assert
 
-``` java
-PaymentGateway payments =
-    mock(PaymentGateway.class);
+<div class="grid grid-cols-2 gap-6">
+<div>
 
-OrderRepository orders =
-    mock(OrderRepository.class);
+**Método testado**
+
+```java
+boolean temSaldoSuficiente(
+    double saldo, double valor) {
+  return saldo >= valor;
+}
 ```
 
-Com mocks, podemos definir respostas para chamadas específicas e
-verificar interações.
+<v-clicks>
 
-**Importante:** mocks são apropriados para dependências externas à
-unidade; não devem substituir indiscriminadamente toda a lógica que se
-quer testar.
+- **Arrange:** define os dados do cenário
+- **Act:** chama **uma** ação
+- **Assert:** confere o resultado esperado
 
-------------------------------------------------------------------------
+</v-clicks>
 
-# Mockito: configurando o cenário
+</div>
+<div>
 
-``` java
-import static org.mockito.Mockito.*;
-import static org.mockito.ArgumentMatchers.any;
+**O teste**
 
+```java
 @Test
-void shouldConfirmOrderWhenPaymentIsApproved() {
-    PaymentGateway payments = mock(PaymentGateway.class);
-    OrderRepository orders = mock(OrderRepository.class);
+void deveAceitarQuandoSaldoCobre() {
+  // Arrange
+  double saldo = 100;
+  double valor = 40;
 
-    Order order = new Order("order-1", false);
-    when(orders.findById("order-1")).thenReturn(order);
-    when(payments.getStatus("order-1"))
-        .thenReturn(PaymentStatus.APPROVED);
+  // Act
+  boolean resultado =
+      temSaldoSuficiente(saldo, valor);
 
-    OrderService service = new OrderService(payments, orders);
-
-    service.confirmIfPaid("order-1");
-
-    verify(orders).save(new Order("order-1", true));
+  // Assert
+  assertTrue(resultado);
 }
 ```
 
--   `when(...).thenReturn(...)`: define a resposta do mock.
--   `verify(...)`: verifica se uma interação ocorreu.
--   `any(...)`: matcher para argumentos quando necessário.
+</div>
+</div>
 
-------------------------------------------------------------------------
+<!--
+Exemplo propositalmente simples, sem banco e sem mock, só para mostrar a estrutura.
+O nome do teste descreve o cenário e o resultado esperado.
+Um teste, uma ação, uma verificação principal.
+Na parte prática os colegas aplicam o mesmo padrão ao TransferenciaService.
+-->
 
-# Testando o cenário de falha
+---
 
-Quando o pagamento não está aprovado, o pedido não deve ser salvo como
-confirmado.
+# Mockito
 
-``` java
-@Test
-void shouldNotSaveOrderWhenPaymentIsRejected() {
-    PaymentGateway payments = mock(PaymentGateway.class);
-    OrderRepository orders = mock(OrderRepository.class);
+**Biblioteca** que simula as dependências de uma classe.
 
-    when(orders.findById("order-1"))
-        .thenReturn(new Order("order-1", false));
-    when(payments.getStatus("order-1"))
-        .thenReturn(PaymentStatus.REJECTED);
+```java
+ContaRepository repo = mock(ContaRepository.class);
 
-    OrderService service = new OrderService(payments, orders);
+when(repo.findById(1L)).thenReturn(Optional.of(conta));
 
-    assertThrows(
-        IllegalStateException.class,
-        () -> service.confirmIfPaid("order-1")
-    );
+service.transferir(...);
 
-    verify(orders, never()).save(any(Order.class));
-}
+verify(repo).save(conta);
 ```
 
-Esse teste verifica duas propriedades:
+<v-clicks>
 
--   A chamada lança a exceção esperada.
--   O repositório não salva o pedido.
+- `when(...).thenReturn(...)`: define a resposta do mock
+- `verify(...)`: confere se a chamada aconteceu
+- Testa a **regra de negócio** sem banco e sem HTTP
+- Mock não é, por si só, teste de integração
 
-------------------------------------------------------------------------
+</v-clicks>
 
-# O que testar além do caminho feliz?
-
-Para a regra de confirmação, considere:
-
-  Cenário                Resultado esperado
-  ---------------------- --------------------------------------------
-  Pagamento aprovado     Pedido confirmado e salvo
-  Pagamento recusado     Exceção; pedido não salvo
-  Pagamento pendente     Exceção; pedido não salvo
-  Pedido inexistente     Erro apropriado, conforme o contrato
-  Gateway indisponível   Falha tratada conforme a política definida
-
-Não invente o comportamento de erro durante o teste: primeiro defina o
-contrato esperado da aplicação.
-
-------------------------------------------------------------------------
+---
 
 # JaCoCo: cobertura de código
 
-JaCoCo instrumenta ou analisa o bytecode Java para calcular métricas
-como:
+JaCoCo instrumenta ou analisa o bytecode Java para calcular métricas como:
 
--   **Cobertura de instruções:** instruções executadas.
--   **Cobertura de branches:** ramificações de decisões executadas,
-    quando aplicável.
--   **Linhas e métodos:** métricas complementares.
+- **Cobertura de instruções:** instruções executadas
+- **Cobertura de branches:** ramificações de decisões executadas, quando aplicável
+- **Linhas e métodos:** métricas complementares
 
 A cobertura ajuda a encontrar áreas pouco exercitadas.
 
-**Cobertura alta não garante testes bons.** Um teste pode executar uma
-linha sem verificar o resultado correto.
+<v-click>
 
-------------------------------------------------------------------------
+> **Cobertura alta não garante testes bons.** Um teste pode executar uma linha sem verificar o resultado correto.
+
+</v-click>
+
+---
 
 # JaCoCo com Maven
 
-Adicione o plugin ao `pom.xml` do projeto Maven:
+Adicione o plugin ao `pom.xml`:
 
-``` xml
+```xml
 <build>
   <plugins>
     <plugin>
@@ -361,169 +334,79 @@ Adicione o plugin ao `pom.xml` do projeto Maven:
 </build>
 ```
 
-Execute:
+Execute `./mvnw test`. O relatório HTML fica em:
 
-``` bash
-./mvnw test
-```
-
-O relatório HTML costuma ser gerado em:
-
-``` text
+```text
 target/site/jacoco/index.html
 ```
 
-Verifique a versão do plugin compatível com a versão de Java usada no
-projeto. A configuração acima é um exemplo de referência; ajuste-a
-conforme o `pom.xml` e o build existentes.
+<!--
+Verifique a versão do plugin compatível com a versão de Java do projeto.
+A configuração é um exemplo de referência; ajuste conforme o pom.xml existente.
+-->
 
-------------------------------------------------------------------------
+---
 
-# Dependências de teste no Maven
+# JUnit × pytest
 
-Em um projeto Java com JUnit 5 e Mockito, uma configuração comum inclui:
+<div class="grid grid-cols-2 gap-4">
+<div>
 
-``` xml
-<dependency>
-  <groupId>org.junit.jupiter</groupId>
-  <artifactId>junit-jupiter</artifactId>
-  <scope>test</scope>
-</dependency>
+**JUnit 5 (Java)**
 
-<dependency>
-  <groupId>org.mockito</groupId>
-  <artifactId>mockito-core</artifactId>
-  <scope>test</scope>
-</dependency>
+```java
+@Test
+void deveLancarErro() {
+    assertEquals(5, soma(2, 3));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> dividir(1, 0));
+}
 ```
 
-Se o projeto usa Spring Boot, prefira avaliar o
-`spring-boot-starter-test`, que normalmente já reúne JUnit Jupiter,
-Mockito e outras ferramentas de teste.
+</div>
+<div>
 
-**Boas práticas:** - Deixe versões gerenciadas pelo BOM do Spring Boot,
-quando aplicável. - Confirme a configuração do Surefire e a versão do
-Java. - Não adicione dependências redundantes sem necessidade.
+**pytest (Python)**
 
-------------------------------------------------------------------------
+```python
+def test_deve_lancar_erro():
+    assert soma(2, 3) == 5
+    with pytest.raises(ValueError):
+        dividir(1, 0)
+```
 
-# Teste unitário versus integração
+</div>
+</div>
 
-  -----------------------------------------------------------------------
-  Aspecto                 Unitário                Integração
-  ----------------------- ----------------------- -----------------------
-  Escopo                  Uma unidade             Componentes combinados
+| | JUnit 5 | pytest |
+|---|---|---|
+| Linguagem | Java (tipagem estática) | Python (tipagem dinâmica) |
+| Estrutura | Classes e anotações (`@Test`) | Funções `test_*` |
+| Asserções | Métodos (`assertEquals`) | `assert` simples |
+| Preparação | `@BeforeEach` | *fixtures* |
+| Vários casos | `@ParameterizedTest` | `@pytest.mark.parametrize` |
+| Mocks | Mockito | `unittest.mock` / pytest-mock |
+| Cobertura | JaCoCo | coverage.py / pytest-cov |
 
-  Banco real              Geralmente não          Pode usar
+<!--
+Ideia central: o objetivo é o mesmo (testar), muda o estilo.
+JUnit é mais verboso e explícito; pytest é mais enxuto.
+-->
 
-  Dependências            Frequentemente isoladas Parte delas é real
-
-  Velocidade              Geralmente alta         Geralmente menor
-
-  Falhas encontradas      Regra ou lógica local   Configuração e
-                                                  contratos entre
-                                                  componentes
-  -----------------------------------------------------------------------
-
-Um teste com Spring Boot e banco em memória pode ser útil, mas não
-comprova necessariamente compatibilidade com o banco usado em produção.
-
-Para maior confiança, use um ambiente de teste representativo, por
-exemplo com Testcontainers, quando fizer sentido.
-
-------------------------------------------------------------------------
-
-# Um teste de integração: o que validar?
-
-Imagine um endpoint `POST /orders/{id}/confirm`.
-
-Um teste de integração pode validar:
-
-1.  A aplicação sobe com a configuração de teste.
-2.  A requisição chega ao controller.
-3.  O serviço aplica a regra.
-4.  O repositório persiste o resultado.
-5.  A resposta HTTP corresponde ao contrato da API.
-
-Dependendo do objetivo, use `@SpringBootTest`, testes de fatia como
-`@WebMvcTest` ou testes de persistência específicos.
-
-**Escolha o escopo mínimo que comprova o comportamento desejado.**
-
-------------------------------------------------------------------------
-
-# Erros comuns
-
--   Testar métodos privados diretamente em vez do comportamento público.
--   Verificar apenas chamadas, sem validar efeitos relevantes.
--   Usar mocks para tudo e nunca testar integrações reais.
--   Escrever testes dependentes da ordem de execução.
--   Testar implementação interna de forma excessiva.
--   Tratar cobertura como sinônimo de qualidade.
--   Não testar cenários de erro e limites.
--   Deixar testes passarem sem asserções significativas.
-
-------------------------------------------------------------------------
-
-# Live coding: desafio
-
-Implemente e teste esta regra:
-
-> Um pedido só pode ser confirmado quando o pagamento estiver aprovado.
-
-Em duplas ou individualmente:
-
-1.  Escreva o teste para pagamento aprovado.
-2.  Escreva o teste para pagamento recusado.
-3.  Use Mockito para simular o gateway e o repositório.
-4.  Execute os testes.
-5.  Gere o relatório JaCoCo.
-6.  Identifique um cenário ainda não coberto e adicione um teste.
-
-**Critério de conclusão:** os testes falham quando a regra é violada e
-passam quando o comportamento está correto.
-
-------------------------------------------------------------------------
-
-# Discussão: como sabemos que o teste é bom?
-
-Perguntas para a turma:
-
--   Um teste com 100% de cobertura pode estar errado?
--   Quando faz sentido usar um mock?
--   O que um teste unitário não consegue garantir?
--   Qual cenário de erro é mais importante neste serviço?
--   Como evitar que testes fiquem acoplados à implementação?
-
-Não existe um percentual universal que garanta qualidade. Defina metas
-de cobertura como indicadores, considerando risco, criticidade e custo
-de manutenção.
-
-------------------------------------------------------------------------
+---
+layout: center
+class: text-center
+---
 
 # Resumo
 
--   **JUnit 5:** estrutura e executa os testes.
--   **Mockito:** isola dependências e verifica interações.
--   **JaCoCo:** mede cobertura de código.
--   **Testes unitários:** validam comportamentos de unidades isoladas.
--   **Testes de integração:** validam componentes trabalhando em
-    conjunto.
--   **Qualidade:** depende de cenários relevantes, boas asserções e
-    testes confiáveis --- não apenas de cobertura.
+Testamos para **proteger as regras de negócio**
 
-------------------------------------------------------------------------
+<br>
 
-# Referências oficiais
+**JUnit** executa e verifica · **Mockito** isola · **JaCoCo** mede
 
--   JUnit 5 --- User Guide:
-    https://junit.org/junit5/docs/current/user-guide/
--   Mockito --- documentação:
-    https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html
--   JaCoCo --- documentação: https://www.jacoco.org/jacoco/trunk/doc/
--   Maven Surefire Plugin:
-    https://maven.apache.org/surefire/maven-surefire-plugin/
--   Spring Boot --- Testing:
-    https://docs.spring.io/spring-boot/reference/testing/
+<br>
 
-Consulte as versões compatíveis com o projeto usado na aula.
+**Unitário:** valida uma unidade isolada · **Integração:** valida componentes em conjunto
