@@ -294,28 +294,6 @@ JaCoCo é uma ferramenta de cobertura. Ela instrumenta a execução dos testes e
 
 Ele **não cria testes nem prova que as asserções estão corretas**.
 
-No `pom.xml`, adicione o plugin ao bloco `<build><plugins>`:
-
-```xml
-<plugin>
-    <groupId>org.jacoco</groupId>
-    <artifactId>jacoco-maven-plugin</artifactId>
-    <version>0.8.15</version>
-    <executions>
-        <execution>
-            <goals><goal>prepare-agent</goal></goals>
-        </execution>
-        <execution>
-            <id>report</id>
-            <phase>verify</phase>
-            <goals><goal>report</goal></goals>
-        </execution>
-    </executions>
-</plugin>
-```
-
-A versão `0.8.15` tem suporte oficial a Java 26; portanto, cobre também o Java 25 usado neste exemplo.
-
 ---
 
 ## Executar testes e criar relatório
