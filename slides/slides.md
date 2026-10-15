@@ -16,7 +16,7 @@ Validação de regras de negócio em um microsserviço Java
 
 Renata · Alessandra · Heitor · Aroldo
 
-15/10
+
 
 ---
 
@@ -102,11 +102,7 @@ Testa **componentes juntos**: controller, service e banco.
 </div>
 </div>
 
-<v-click>
 
-> **Atenção:** usar Mockito não torna um teste de integração. Se há mock, ainda é unitário.
-
-</v-click>
 
 <!--
 Os colegas mostram os dois na parte prática:
@@ -386,7 +382,7 @@ def test_deve_lancar_erro():
 | Asserções | Métodos (`assertEquals`) | `assert` simples |
 | Preparação | `@BeforeEach` | *fixtures* |
 | Vários casos | `@ParameterizedTest` | `@pytest.mark.parametrize` |
-| Mocks | Mockito | `unittest.mock` / pytest-mock |
+| Mocks | Mockito |  pytest-mock |
 | Cobertura | JaCoCo | coverage.py / pytest-cov |
 
 <!--
