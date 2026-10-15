@@ -9,6 +9,9 @@ on:
 jobs:
   testes:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api-pix
 
     steps:
       - name: Baixar o código
@@ -20,6 +23,7 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
+          cache-dependency-path: api-pix/pom.xml
 
       - name: Rodar testes (JUnit + Mockito) e cobertura (JaCoCo)
         run: mvn -B clean verify
