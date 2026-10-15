@@ -276,7 +276,7 @@ verify(repo).save(conta);
 - `when(...).thenReturn(...)`: define a resposta do mock
 - `verify(...)`: confere se a chamada aconteceu
 - Testa a **regra de negócio** sem banco e sem HTTP
-- Mock não é, por si só, teste de integração
+
 
 </v-clicks>
 
