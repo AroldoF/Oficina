@@ -400,6 +400,182 @@ table { font-size: 0.85em; }
 </style>
 
 ---
+
+# Integração Contínua (CI)
+
+**E se alguém esquecer de rodar os testes?**
+
+<div class="grid grid-cols-2 gap-8 pt-4">
+<div>
+
+### Sem CI
+
+<v-clicks>
+
+- "Na minha máquina funciona"
+- Alguém esquece de rodar os testes
+- O bug aparece dias depois
+- A cobertura cai sem ninguém notar
+
+</v-clicks>
+
+</div>
+<div>
+
+### Com CI
+
+<v-clicks>
+
+- Roda numa máquina **limpa**
+- Os testes rodam **sempre**, a cada push e PR
+- O bug aparece em **minutos**, no commit exato
+- A cobertura mínima vira **regra**
+
+</v-clicks>
+
+</div>
+</div>
+
+<!--
+Até aqui: JUnit escreve, Mockito isola, JaCoCo mede. Mas só funciona se alguém lembrar de rodar.
+CI = a cada mudança, um servidor faz build + testes automaticamente.
+Usaremos o GitHub Actions, que já vem integrado ao GitHub.
+-->
+
+---
+
+# GitHub Actions: um único arquivo
+
+`.github/workflows/ci.yml`
+
+```yaml {all|3-7|10|13-14|16-21|23-24}
+name: CI - Testes Java
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v5
+
+      - name: Configurar JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Testes (JUnit + Mockito) e cobertura (JaCoCo)
+        run: ./mvnw -B clean verify
+```
+
+<!--
+Quando: todo push e PR na main.
+Onde: uma VM Ubuntu nova a cada execução.
+O quê: 3 passos — baixar o código, instalar o Java (com cache do Maven), rodar mvn verify.
+O YAML é simples porque a inteligência está no pom.xml.
+-->
+
+---
+
+# O que acontece a cada push
+
+```mermaid {scale: 0.75}
+flowchart LR
+    A[push / PR] --> B[Runner Ubuntu]
+    B --> C["mvn verify"]
+    C --> D[JUnit + Mockito<br/>executam os testes]
+    C --> E[JaCoCo<br/>mede a cobertura]
+    D --> F{Passou?}
+    E --> F
+    F -- Sim --> G[✅ Build verde]
+    F -- Não --> H[❌ Build vermelho]
+```
+
+<v-clicks>
+
+- **JUnit:** um `assert` falhou → build vermelho
+- **Mockito:** sem banco nem serviços reais → testes **rápidos** e **estáveis** no CI
+- **JaCoCo:** cobertura abaixo do mínimo → build vermelho
+
+</v-clicks>
+
+<!--
+O CI só orquestra; quem faz o trabalho são as ferramentas configuradas no pom.xml.
+Sem mocks, o pipeline precisaria subir banco, filas, outros serviços: lento e instável.
+-->
+
+---
+
+# JaCoCo como "porteiro"
+
+Adicione a meta `check` ao plugin do JaCoCo no `pom.xml`:
+
+```xml
+<execution>
+  <id>check</id>
+  <phase>verify</phase>
+  <goals><goal>check</goal></goals>
+  <configuration>
+    <rules>
+      <rule>
+        <element>BUNDLE</element>
+        <limits>
+          <limit>
+            <counter>LINE</counter>
+            <value>COVEREDRATIO</value>
+            <minimum>0.80</minimum>
+          </limit>
+        </limits>
+      </rule>
+    </rules>
+  </configuration>
+</execution>
+```
+
+<v-click>
+
+> Por isso `verify` e não `test`: o `check` roda na fase **verify**, depois dos testes.
+
+</v-click>
+
+<!--
+mvn test para antes do verify, então o limite de cobertura não é aplicado.
+Se mvn verify passa na sua máquina, passa no CI: é exatamente o mesmo comando.
+-->
+
+---
+
+# Bloqueando o merge
+
+**Settings → Branches →** regra para `main` → *Require status checks to pass*
+
+```text
+Teste falhou             →  ❌ merge bloqueado
+Cobertura abaixo de 80%  →  ❌ merge bloqueado
+Tudo passou              →  ✅ merge liberado
+```
+
+<v-click>
+
+<br>
+
+> **JUnit + Mockito + JaCoCo + CI** = nenhum código sem teste entra na `main`.
+
+</v-click>
+
+<!--
+Por padrão o CI só avisa. Com a proteção de branch, ele impede.
+Demo: abrir PR com teste quebrado (expected 90 but was 100) e PR com código sem teste (cobertura 72%).
+-->
+
+---
 layout: center
 class: text-center
 ---
@@ -410,7 +586,7 @@ Testamos para **proteger as regras de negócio**
 
 <br>
 
-**JUnit** executa e verifica · **Mockito** isola · **JaCoCo** mede
+**JUnit** executa e verifica · **Mockito** isola · **JaCoCo** mede · **CI** automatiza
 
 <br>
 
